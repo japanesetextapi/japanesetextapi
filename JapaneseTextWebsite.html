@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JapaneseTextAPI — Learner-ready Japanese text processing</title>
+  <meta name="description" content="Normalize, tokenize, segment, and generate furigana or ruby HTML for Japanese text with one simple developer API." />
+  <style>
+    :root {
+      --bg: #101113;
+      --bg-soft: #17181c;
+      --panel: rgba(30, 31, 36, 0.84);
+      --panel-strong: #24252b;
+      --text: #fff7f9;
+      --muted: #d9cbd1;
+      --faint: #91858b;
+      --line: rgba(255, 247, 249, 0.12);
+      --accent: #e98aa9;
+      --accent-soft: rgba(233, 138, 169, 0.16);
+      --accent-line: rgba(233, 138, 169, 0.4);
+      --warning: #f0c987;
+      --danger: #ff7a7a;
+      --paper: #fff0f4;
+      --ink: #101113;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      --radius-lg: 28px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --max: 1160px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(243, 167, 189, 0.18), transparent 34%),
+        radial-gradient(circle at 78% 6%, rgba(255, 240, 244, 0.08), transparent 28%),
+        linear-gradient(180deg, #101113 0%, #15161a 48%, #0d0e10 100%);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.55;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 240, 244, 0.032) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 240, 244, 0.032) 1px, transparent 1px);
+      background-size: 54px 54px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.82), transparent 80%);
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto -10% -45% -10%;
+      height: 55vh;
+      background: radial-gradient(ellipse at center, rgba(233, 138, 169, 0.13), transparent 62%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      width: min(var(--max), calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .nav-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(18px);
+      background: rgba(16, 17, 19, 0.74);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    nav {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(233, 138, 169, 0.98), rgba(233, 138, 169, 0.34)),
+        #24252b;
+      box-shadow: 0 0 0 1px rgba(233, 138, 169, 0.3), 0 12px 35px rgba(233, 138, 169, 0.2);
+      display: grid;
+      place-items: center;
+      color: var(--paper);
+      font-weight: 900;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-actions { display: flex; gap: 12px; align-items: center; }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+      transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.075); }
+
+    .button.primary {
+      color: #24161b;
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 14px 38px rgba(56, 221, 184, 0.22);
+    }
+
+    .button.primary:hover { background: #f0a0b8; }
+
+    .button.ghost { color: var(--muted); }
+
+    header.hero {
+      padding: 92px 0 72px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.03fr 0.97fr;
+      gap: 42px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #ffd6e4;
+      background: rgba(233, 138, 169, 0.13);
+      border: 1px solid rgba(233, 138, 169, 0.28);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      font-size: clamp(44px, 6vw, 76px);
+      line-height: 0.94;
+      letter-spacing: -0.075em;
+      margin: 0 0 24px;
+      max-width: 850px;
+    }
+
+    .hero-copy {
+      font-size: clamp(18px, 2vw, 22px);
+      color: var(--muted);
+      max-width: 650px;
+      margin: 0 0 32px;
+    }
+
+    .hero-copy strong { color: var(--text); font-weight: 750; }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .trust-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      color: var(--faint);
+      font-size: 13px;
+    }
+
+    .trust-row span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 16px rgba(233, 138, 169, 0.88);
+    }
+
+    .demo-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(34, 35, 40, 0.94), rgba(24, 25, 29, 0.88));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .demo-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 0%, rgba(233,138,169,0.15), transparent 34%);
+      pointer-events: none;
+    }
+
+    .window-bar {
+      height: 48px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px;
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 12px;
+      position: relative;
+    }
+
+    .traffic {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+    }
+
+    .window-title { margin-left: 8px; }
+
+    .code-panel {
+      padding: 22px;
+      position: relative;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: #fff1f5;
+    }
+
+    .code-muted { color: #9a8d94; }
+    .code-green { color: #ffd4de; }
+    .code-yellow { color: #f0c987; }
+    .code-blue { color: #e98aa9; }
+
+    .ruby-example {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    rt { color: var(--accent); font-size: 12px; font-weight: 700; }
+
+    section { padding: 78px 0; }
+
+    .section-head {
+      max-width: 720px;
+      margin-bottom: 32px;
+    }
+
+    .section-kicker {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 12px;
+      font-weight: 850;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.02;
+      letter-spacing: -0.055em;
+      margin: 0 0 16px;
+    }
+
+    .section-lede {
+      color: var(--muted);
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .feature-card, .pricing-card, .docs-card, .simple-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: rgba(30, 31, 36, 0.7);
+      padding: 24px;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.18);
+    }
+
+    .feature-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-line);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-weight: 900;
+      margin-bottom: 18px;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      letter-spacing: -0.025em;
+    }
+
+    .card-text {
+      color: var(--muted);
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .step {
+      padding: 20px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.09);
+      position: relative;
+    }
+
+    .step-number {
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .step strong { display: block; margin-bottom: 6px; }
+    .step p { color: var(--muted); margin: 0; font-size: 14px; }
+
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 0.85fr 1.15fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .endpoint-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .endpoint {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .method {
+      color: #24161b;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-family: var(--mono);
+      font-weight: 900;
+      font-size: 11px;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .pricing-card {
+      padding: 28px;
+      position: relative;
+    }
+
+    .pricing-card.featured {
+      border-color: rgba(233, 138, 169, 0.6);
+      background: linear-gradient(180deg, rgba(233, 138, 169, 0.16), rgba(30, 31, 36, 0.74));
+    }
+
+    .badge {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      color: #24161b;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .price {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 18px 0 12px;
+    }
+
+    .price strong {
+      font-size: 44px;
+      letter-spacing: -0.06em;
+    }
+
+    .price span { color: var(--muted); }
+
+    .pricing-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 22px 0;
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pricing-card li::before {
+      content: "✓";
+      color: var(--accent);
+      font-weight: 900;
+      margin-right: 8px;
+    }
+
+    .pricing-note {
+      margin-top: 18px;
+      color: var(--faint);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: 18px 0 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .list li {
+      color: var(--muted);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .list li::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 8px;
+      flex: 0 0 auto;
+    }
+
+    .cta {
+      padding: 84px 0 96px;
+    }
+
+    .cta-card {
+      border: 1px solid rgba(233, 138, 169, 0.36);
+      border-radius: 34px;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(233, 138, 169, 0.2), transparent 34%),
+        linear-gradient(135deg, rgba(34, 35, 40, 0.96), rgba(16, 17, 19, 0.96));
+      padding: clamp(32px, 6vw, 64px);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .cta-card h2 { max-width: 780px; margin-left: auto; margin-right: auto; }
+    .cta-card p { max-width: 680px; margin: 0 auto 28px; color: var(--muted); font-size: 18px; }
+
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 28px 0;
+      color: var(--faint);
+      font-size: 14px;
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links { display: flex; gap: 18px; }
+    .footer-links a:hover { color: var(--muted); }
+
+    @media (max-width: 940px) {
+      .hero-grid, .docs-layout, .split { grid-template-columns: 1fr; }
+      .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+      .workflow { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      header.hero { padding-top: 62px; }
+    }
+
+    @media (max-width: 580px) {
+      .container { width: min(100% - 28px, var(--max)); }
+      .nav-actions .ghost { display: none; }
+      .hero-actions .button { width: 100%; }
+      .button { width: 100%; }
+      .ruby-example { font-size: 22px; }
+      .brand span { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="nav-wrap">
+    <div class="container">
+      <nav aria-label="Main navigation">
+        <a class="brand" href="#top" aria-label="JapaneseTextAPI home">
+          <div class="logo-mark">文</div>
+          <span>JapaneseTextAPI</span>
+        </a>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#docs">Docs</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+        <div class="nav-actions">
+          <a class="button ghost" href="#docs">View docs</a>
+          <a class="button primary" href="#pricing">Get API key</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+
+  <main id="top">
+    <header class="hero">
+      <div class="container hero-grid">
+        <div>
+          <h1>Turn raw Japanese into learner-ready text.</h1>
+          <p class="hero-copy">
+            Normalize, segment, tokenize, and generate <strong>furigana or ruby HTML</strong> with one simple API built for language apps, flashcards, readers, subtitle workflows, and immersion tools.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#pricing">Start building</a>
+            <a class="button" href="#docs">Read the API docs</a>
+          </div>
+          <div class="trust-row" aria-label="Product guarantees">
+            <span><span class="dot"></span> No dashboard required</span>
+            <span><span class="dot"></span> API-key auth</span>
+            <span><span class="dot"></span> JSON + ruby HTML output</span>
+          </div>
+        </div>
+
+        <aside class="demo-card" aria-label="API example">
+          <div class="window-bar">
+            <span class="traffic"></span><span class="traffic"></span><span class="traffic"></span>
+            <span class="window-title">POST /ruby-html</span>
+          </div>
+          <div class="code-panel">
+            <pre><span class="code-muted">curl -X POST</span> <span class="code-green">https://api.japanesetextapi.com/ruby-html</span> \
+  <span class="code-yellow">-H</span> <span class="code-blue">"x-api-key: YOUR_API_KEY"</span> \
+  <span class="code-yellow">-H</span> <span class="code-blue">"content-type: application/json"</span> \
+  <span class="code-yellow">-d</span> <span class="code-blue">'{"text":"私は日本語を勉強しています。"}'</span></pre>
+            <div class="ruby-example" lang="ja">
+              <ruby>私<rt>わたし</rt></ruby>は<ruby>日本語<rt>にほんご</rt></ruby>を<ruby>勉強<rt>べんきょう</rt></ruby>しています。
+            </div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <section id="features">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">What it does</div>
+          <h2>One practical API for Japanese text prep.</h2>
+          <p class="section-lede">Stop stitching together one-off scripts for furigana, tokenization, sentence splitting, and display formatting. Send text in. Get app-ready output back.</p>
+        </div>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon">正</div>
+            <h3>Normalize text</h3>
+            <p class="card-text">Clean width differences, spacing, punctuation, and common formatting issues before your app tries to process Japanese text.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">分</div>
+            <h3>Segment + tokenize</h3>
+            <p class="card-text">Split paragraphs into sentences and return morphological tokens with surface forms, readings, and useful metadata.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">読</div>
+            <h3>Furigana + ruby</h3>
+            <p class="card-text">Generate structured furigana JSON or browser-ready ruby HTML for readers, flashcards, subtitles, and learning interfaces.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Simple pipeline</div>
+          <h2>From messy text to learner-ready output.</h2>
+          <p class="section-lede">Use only the endpoints you need, or chain them together into a clean Japanese text-prep flow.</p>
+        </div>
+
+        <div class="workflow">
+          <div class="step">
+            <div class="step-number">01</div>
+            <strong>Normalize</strong>
+            <p>Clean width, whitespace, and punctuation.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">02</div>
+            <strong>Segment</strong>
+            <p>Split long text into usable Japanese sentences.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">03</div>
+            <strong>Tokenize</strong>
+            <p>Return surface forms, readings, and token metadata.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">04</div>
+            <strong>Furigana</strong>
+            <p>Attach kana readings to kanji-containing tokens.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">05</div>
+            <strong>Render</strong>
+            <p>Output JSON or browser-ready ruby HTML.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="docs">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Developer friendly</div>
+          <h2>Small API surface. Clear responses.</h2>
+          <p class="section-lede">Designed to be boring in the best way: predictable endpoints, API-key auth, clear errors, and no account portal required.</p>
+        </div>
+
+        <div class="docs-layout">
+          <article class="docs-card">
+            <h3>Endpoints</h3>
+            <p class="card-text" style="margin-bottom: 18px;">All paid endpoints use the <code>x-api-key</code> header.</p>
+            <div class="endpoint-list">
+              <div class="endpoint"><span><span class="method">GET</span> /health</span></div>
+              <div class="endpoint"><span><span class="method">POST</span> /normalize</span></div>
+              <div class="endpoint"><span><span class="method">POST</span> /segment</span></div>
+              <div class="endpoint"><span><span class="method">POST</span> /tokenize</span></div>
+              <div class="endpoint"><span><span class="method">POST</span> /furigana</span></div>
+              <div class="endpoint"><span><span class="method">POST</span> /ruby-html</span></div>
+            </div>
+          </article>
+
+          <article class="demo-card">
+            <div class="window-bar">
+              <span class="traffic"></span><span class="traffic"></span><span class="traffic"></span>
+              <span class="window-title">Example response</span>
+            </div>
+            <div class="code-panel">
+              <pre>{
+  <span class="code-blue">"tokens"</span>: [
+    {
+      <span class="code-blue">"surface"</span>: <span class="code-green">"日本語"</span>,
+      <span class="code-blue">"reading"</span>: <span class="code-green">"にほんご"</span>,
+      <span class="code-blue">"furigana"</span>: <span class="code-green">"にほんご"</span>,
+      <span class="code-blue">"hasKanji"</span>: true
+    },
+    {
+      <span class="code-blue">"surface"</span>: <span class="code-green">"を"</span>,
+      <span class="code-blue">"reading"</span>: <span class="code-green">"を"</span>,
+      <span class="code-blue">"furigana"</span>: null,
+      <span class="code-blue">"hasKanji"</span>: false
+    }
+  ],
+  <span class="code-blue">"usage"</span>: {
+    <span class="code-blue">"characters"</span>: 13
+  }
+}</pre>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Pricing</div>
+          <h2>Simple monthly plans. No surprise overages.</h2>
+          <p class="section-lede">Hard usage caps keep costs predictable. Upgrade when you need more characters, or wait until the monthly reset.</p>
+        </div>
+
+        <div class="pricing-grid">
+          <article class="pricing-card">
+            <h3>Starter</h3>
+            <p class="card-text">For prototypes, flashcard tools, and small personal projects.</p>
+            <div class="price"><strong>$9</strong><span>/ month</span></div>
+            <ul>
+              <li>500,000 characters/month</li>
+              <li>All text endpoints</li>
+              <li>JSON + ruby HTML</li>
+              <li>Email support</li>
+            </ul>
+            <a class="button" href="https://buy.stripe.com/YOUR_STARTER_LINK">Get Starter</a>
+          </article>
+
+          <article class="pricing-card featured">
+            <div class="badge">Popular</div>
+            <h3>Builder</h3>
+            <p class="card-text">For apps, browser extensions, and heavier learning workflows.</p>
+            <div class="price"><strong>$19</strong><span>/ month</span></div>
+            <ul>
+              <li>2,000,000 characters/month</li>
+              <li>All text endpoints</li>
+              <li>Higher practical ceiling</li>
+              <li>Email support</li>
+            </ul>
+            <a class="button primary" href="https://buy.stripe.com/YOUR_BUILDER_LINK">Get Builder</a>
+          </article>
+
+          <article class="pricing-card">
+            <h3>Small App</h3>
+            <p class="card-text">For production tools with real users but simple needs.</p>
+            <div class="price"><strong>$49</strong><span>/ month</span></div>
+            <ul>
+              <li>10,000,000 characters/month</li>
+              <li>All text endpoints</li>
+              <li>Hard monthly cap</li>
+              <li>Email support</li>
+            </ul>
+            <a class="button" href="https://buy.stripe.com/YOUR_SMALL_APP_LINK">Get Small App</a>
+          </article>
+        </div>
+        <p class="pricing-note">No dashboard. No overages. No account portal. Cancel through Stripe; inactive subscriptions deactivate API keys.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="container split">
+        <article class="simple-card">
+          <div class="section-kicker">Built for</div>
+          <h2 style="font-size: 34px;">Language tools that need clean Japanese.</h2>
+          <ul class="list">
+            <li>Reader apps that need furigana display.</li>
+            <li>Flashcard tools that need tokenized Japanese.</li>
+            <li>Browser extensions that need ruby HTML.</li>
+            <li>Subtitle workflows that need sentence segmentation.</li>
+            <li>Immersion tools that need structured text output.</li>
+          </ul>
+        </article>
+
+        <article class="simple-card">
+          <div class="section-kicker">Support policy</div>
+          <h2 style="font-size: 34px;">Lightweight by design.</h2>
+          <ul class="list">
+            <li>Email-only support for bugs and key delivery issues.</li>
+            <li>No custom integration work included.</li>
+            <li>No formal uptime SLA.</li>
+            <li>No account portal or usage dashboard.</li>
+            <li>Clear docs and predictable API responses.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container">
+        <div class="cta-card">
+          <div class="section-kicker">Start simple</div>
+          <h2>Give your app Japanese text it can actually use.</h2>
+          <p>Use JapaneseTextAPI to normalize, tokenize, segment, and render furigana without building a custom Japanese text pipeline from scratch.</p>
+          <div class="hero-actions" style="justify-content: center; margin-bottom: 0;">
+            <a class="button primary" href="#pricing">Get API key</a>
+            <a class="button" href="#docs">View example request</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <div>© <span id="year"></span> JapaneseTextAPI. Lightweight Japanese text processing for developers.</div>
+      <div class="footer-links">
+        <a href="#docs">Docs</a>
+        <a href="#pricing">Pricing</a>
+        <a href="mailto:support@example.com">Support</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
