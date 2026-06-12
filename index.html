@@ -780,7 +780,7 @@
               <li>JSON + ruby HTML</li>
               <li>Email support</li>
             </ul>
-            <a class="button" href="https://buy.stripe.com/YOUR_STARTER_LINK">Get Starter</a>
+            <button type="button" class="button" data-plan="starter">Get Starter</button>
           </article>
 
           <article class="pricing-card featured">
@@ -794,7 +794,7 @@
               <li>Higher practical ceiling</li>
               <li>Email support</li>
             </ul>
-            <a class="button primary" href="https://buy.stripe.com/YOUR_BUILDER_LINK">Get Builder</a>
+            <button type="button" class="button primary" data-plan="builder">Get Builder</button>
           </article>
 
           <article class="pricing-card">
@@ -807,7 +807,7 @@
               <li>Hard monthly cap</li>
               <li>Email support</li>
             </ul>
-            <a class="button" href="https://buy.stripe.com/YOUR_SMALL_APP_LINK">Get Small App</a>
+            <button type="button" class="button" data-plan="small-app">Get Small App</button>
           </article>
         </div>
         <p class="pricing-note">No dashboard. No overages. No account portal. Cancel through Stripe; inactive subscriptions deactivate API keys.</p>
@@ -870,6 +870,36 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Cloudflare Worker (API) base URL. Switch to https://api.japanesetextapi.com
+    // once a Worker custom domain is configured.
+    const API_BASE_URL = 'https://japanesetextapi.japanesetextapi.workers.dev';
+
+    async function startCheckout(plan, button) {
+      const original = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Redirecting…';
+      try {
+        const res = await fetch(API_BASE_URL + '/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          throw new Error((data.error && data.error.message) || 'Checkout failed.');
+        }
+        window.location.href = data.url;
+      } catch (err) {
+        button.disabled = false;
+        button.textContent = original;
+        alert('Could not start checkout: ' + err.message);
+      }
+    }
+
+    document.querySelectorAll('[data-plan]').forEach((button) => {
+      button.addEventListener('click', () => startCheckout(button.dataset.plan, button));
+    });
   </script>
 </body>
 </html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your API Key · JapaneseTextAPI</title>
+  <style>
+    :root {
+      --bg: #101113;
+      --panel: rgba(30, 31, 36, 0.84);
+      --text: #fff7f9;
+      --muted: #d9cbd1;
+      --accent: #e98aa9;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(243, 167, 189, 0.18), transparent 34%),
+        linear-gradient(180deg, #101113 0%, #15161a 48%, #0d0e10 100%);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      line-height: 1.55;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px;
+      padding: 44px;
+      max-width: 580px;
+      width: 100%;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    h1 { margin: 0 0 10px; font-size: 28px; letter-spacing: -0.04em; }
+    p { color: var(--muted); }
+    .key-box { display: flex; gap: 8px; margin: 22px 0; }
+    code {
+      flex: 1;
+      background: #0d0e10;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 15px;
+      word-break: break-all;
+      color: var(--accent);
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 0 20px;
+      background: var(--accent);
+      color: #24161b;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { background: #f0a0b8; }
+    .warn {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(233,138,169,0.1);
+      border: 1px solid rgba(233,138,169,0.32);
+      font-size: 14px;
+      color: #ffd6e4;
+    }
+    .warn code { background: none; border: none; padding: 0; color: inherit; }
+    .status { font-size: 16px; }
+    .docs-link { display: inline-block; margin-top: 24px; color: var(--accent); font-weight: 700; text-decoration: none; }
+    .docs-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Payment successful</h1>
+    <p class="status" id="status">Issuing your API key…</p>
+
+    <div class="key-box" id="keyBox" style="display:none;">
+      <code id="apiKey"></code>
+      <button type="button" id="copyBtn">Copy</button>
+    </div>
+
+    <div class="warn" id="warn" style="display:none;">
+      Store this key now. For security it is shown only once and is not recoverable.
+      Send it in the <code>x-api-key</code> header on every request.
+    </div>
+
+    <a class="docs-link" href="https://japanesetextapi.com/#docs">Read the API docs →</a>
+  </div>
+
+  <script>
+    // Same Worker base URL used by the pricing buttons on the homepage.
+    const API_BASE_URL = 'https://japanesetextapi.japanesetextapi.workers.dev';
+
+    const statusEl = document.getElementById('status');
+    const keyBox = document.getElementById('keyBox');
+    const apiKeyEl = document.getElementById('apiKey');
+    const warnEl = document.getElementById('warn');
+
+    const sessionId = new URLSearchParams(location.search).get('session_id');
+
+    async function fetchKey(attempt = 0) {
+      if (!sessionId) {
+        statusEl.textContent = 'Missing checkout session. Please contact support.';
+        return;
+      }
+      try {
+        const res = await fetch(API_BASE_URL + '/billing/key?session_id=' + encodeURIComponent(sessionId));
+        const data = await res.json();
+        if (res.ok && data.apiKey) {
+          statusEl.textContent = 'Your ' + (data.plan || '') + ' API key is ready:';
+          apiKeyEl.textContent = data.apiKey;
+          keyBox.style.display = 'flex';
+          warnEl.style.display = 'block';
+          return;
+        }
+        // Payment may still be settling; retry a few times.
+        if (res.status === 402 && attempt < 5) {
+          return setTimeout(() => fetchKey(attempt + 1), 2000);
+        }
+        statusEl.textContent = (data.error && data.error.message) || 'Could not retrieve your key.';
+      } catch {
+        if (attempt < 5) return setTimeout(() => fetchKey(attempt + 1), 2000);
+        statusEl.textContent = 'Network error retrieving your key. Please contact support.';
+      }
+    }
+
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(apiKeyEl.textContent);
+    });
+
+    fetchKey();
+  </script>
+</body>
+</html>
